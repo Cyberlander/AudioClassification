@@ -12,6 +12,7 @@ target_dict = {
 
 def get_track_features( path ):
     y, sr = librosa.load( path )
+    HOP_LENGTH = 128
     mfcc = librosa.feature.mfcc( y=y, sr=sr, hop_length=HOP_LENGTH, n_mfcc=13 )
     spectral_center = librosa.feature.spectral_centroid( y=y, sr=sr, hop_length=HOP_LENGTH )
     chroma = librosa.feature.chroma_stft( y=y, sr=sr, hop_length=HOP_LENGTH)
@@ -26,6 +27,8 @@ def extract_target( path ):
 
 def extract_track_feature( track, index ):
     print( "Extracting ", track )
+    TIME_SERIES_LENGTH = 150
+    MERGED_FEATURES_SIZE = 33
     mfcc, spectral_center, chroma, spectral_contrast = get_track_features( track )
     feature_matrix = np.zeros((TIME_SERIES_LENGTH,MERGED_FEATURES_SIZE ))
     feature_matrix[:, 0:13] = mfcc.T[0:TIME_SERIES_LENGTH, :]
@@ -42,8 +45,10 @@ def get_features_of_tracks( track_paths, gender ):
         for i,track in enumerate( track_paths ):
             classes.append( target_dict[gender[i]])
             future = executor.submit( extract_track_feature, track, i)
+            futures.append( future )
     for future in concurrent.futures.as_completed( futures ):
-        data[future[1]] = future[0]
+        track_features, track_index = future.result()
+        data[track_index] = track_features
 
     return data, np.array(classes)
 
@@ -68,7 +73,7 @@ def read_csv( path ):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument( "--time_series_length", type=int, default=128)
+    parser.add_argument( "--time_series_length", type=int, default=150)
     FLAGS, unknown = parser.parse_known_args()
     HOP_LENGTH = 128
     TIME_SERIES_LENGTH = FLAGS.time_series_length
